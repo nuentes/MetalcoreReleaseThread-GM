@@ -9,7 +9,11 @@ This script itself just grabs the data and throws it at the Weekly Release Threa
 -If a release is from an artist that has a FFO that is one of your Favorites, it will highlight a 2nd color
 -Filter of only releases related to your favorites
 
+![image](https://github.com/user-attachments/assets/ddbaa391-0aeb-4757-b392-a3a3f3f92816)
+
 Known issues:
+-Only works on Old Reddit
+-I don't even want to think about how it looks on mobile
 -Config is ugly as hell
 -the dev hasn't written anything in javascript in like 5 years
 -Show Highlighted Only button isn't functional
