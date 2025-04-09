@@ -1,4 +1,4 @@
-The script pulls data from a google doc backend. The google doc automatically pulls the release threads as they are posted and caches all the data along with finding Spotify ArtistID's and AlbumID's, and grabbing recommended artists from LastFM
+All data is pulled from a google doc backend. The google doc automatically pulls the release threads as they are posted and caches all the data along with finding Spotify ArtistID's and AlbumID's, and grabbing recommended artists from LastFM
 
 **This script itself just grabs the data and throws it at the Weekly Release Thread, including:**
 - Adding spotify url for the artist (if found on Spotify)
