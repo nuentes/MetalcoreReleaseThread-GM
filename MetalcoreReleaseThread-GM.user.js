@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Metalcore Weekly Spotify Fans Also Like (Old Reddit)
+// @name         Metalcore Weekly Release Thread
 // @namespace    http://tampermonkey.net/
-// @version      0.56
-// @description  Adds Spotify's "Fans also like" to artist names in r/Metalcore weekly release threads (old Reddit)
-// @author       You
+// @version      0.57
+// @description  Mark up the r/Metalcore Weekly Release Threads
+// @author       nuentes
 // @match        https://old.reddit.com/r/Metalcore/comments/*/weekly_release_thread*
 // @match        https://www.reddit.com/r/Metalcore/comments/*/weekly_release_thread*
 // @grant        GM_xmlhttpRequest
@@ -14,9 +14,8 @@
 (function () {
     'use strict';
 
-    const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbybL8JoBtV0CekQZd5cGW4FLSraLRHZAWAsE5hse-hDmkPZNyPh019XikdddPSCJLcRSQ/exec';
+    const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbz8ZhlauDT6Ot6tVoJtiAk7n8K5MCccnbR35edkkcyCpQ2nO1qzzc241y1CGWSGOEpvGQ/exec';
     const THREAD_ID = location.pathname.split('/')[4];
-    const CACHE_PREFIX = 'mcw-ffo-';
 
     const defaultConfig = {
         favoriteArtists: ["A Day To Remember", "Architects", "As I Lay Dying", "August Burns Red", "Beartooth", "Bring Me The Horizon", "Counterparts", "Currents", "Erra", "Ice Nine Kills", "Killswitch Engage", "Knocked Loose", "Northlane", "Parkway Drive", "Polaris", "Spiritbox", "The Devil Wears Prada", "Wage War"],
@@ -24,30 +23,35 @@
         ffoColor: "#dd9897"
     };
 
-    const postDate = (() => {
-        const timeTag = document.querySelector('time');
-        if (!timeTag || !timeTag.dateTime) return null;
-        const d = new Date(timeTag.dateTime);
-        return d.toISOString().split('T')[0]; // "yyyy-mm-dd"
-    })();
+    function postDate(){
+        const url = window.location.href;
+    	const match = url.match(/weekly_release_thread.*?_(\w+)_\d{1,2}th_(\d{4})/i);
+        if (!match) return null;
 
-    function getCachedResult(artist) {
-        const key = `${CACHE_PREFIX}${THREAD_ID}-${artist.toLowerCase()}`;
-        const cached = localStorage.getItem(key);
-        if (!cached) return null;
+    	const monthName = match[1];
+    	const day = parseInt(url.match(/(\d{1,2})th/)[1]);
+    	const year = parseInt(match[2]);
 
-        const data = JSON.parse(cached);
-        return data.announce === postDate ? data : null;
+    	// Convert month name to number
+    	const months = {
+    		jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    	};
+
+        var dayPad = String(day).padStart(2,'0')
+
+    	const monthIndex = months[monthName.substr(0,3).toLowerCase()];
+        return `${year}-${monthIndex}-${dayPad}`
     }
 
     const CONFIG = JSON.parse(localStorage.getItem('mcw-config') || JSON.stringify(defaultConfig));
 
     function extractArtistNames() {
-        const mdBlocks = document.querySelectorAll('.md');
+        const mdBlocks = document.querySelectorAll('.md')[1];
         const artistMap = new Map();
 
-        for (const md of mdBlocks) {
-            const paragraphs = md.querySelectorAll('p');
+        //for (const md of mdBlocks) {
+            //const paragraphs = md.querySelectorAll('p');
+            const paragraphs = mdBlocks.querySelectorAll('p');
             for (const p of paragraphs) {
                 if (p.querySelector('strong')) continue;
 
@@ -71,51 +75,28 @@
                     }
                 }
             }
-        }
+        //}
 
         return Array.from(artistMap.values());
     }
 
-    function getCachedResult(artist) {
-        const key = `${CACHE_PREFIX}${THREAD_ID}-${artist.toLowerCase()}`;
-        const cached = localStorage.getItem(key);
-        return cached ? JSON.parse(cached) : null;
-    }
-
-    function setCachedResult(artist, data) {
-        const key = `${CACHE_PREFIX}${THREAD_ID}-${artist.toLowerCase()}`;
-        localStorage.setItem(key, JSON.stringify(data));
-    }
-
-    async function fetchFFOData(artistObjects) {
+    async function fetchFFOData(artistObjects, announceDate) {
         const allResults = {};
-        const toQuery = [];
+        const stillMissing = [];
 
         for (const obj of artistObjects) {
-            const cached = getCachedResult(obj.artist);
-            if (cached) {
-                allResults[obj.artist.toLowerCase()] = cached;
-            } else {
-                toQuery.push(obj.artist);
-            }
+            stillMissing.push(obj.artist.toLowerCase());
         }
 
-        // First try to fetch based only on postDate
-        if (toQuery.length === 0) return allResults;
-
-        const url = `${GOOGLE_SHEET_API}?artists=${encodeURIComponent(toQuery.join('|'))}&announce=${postDate}`;
+        const url = `${GOOGLE_SHEET_API}?announce=${announceDate}`;
         try {
             const res = await fetch(url);
             const json = await res.json();
-            const stillMissing = [];
 
             for (const [artist, data] of Object.entries(json)) {
-                if (data && data.announce === postDate) {
-                    allResults[artist.toLowerCase()] = data;
-                    setCachedResult(artist, data);
-                } else {
-                    stillMissing.push(artist);
-                }
+                allResults[artist.toLowerCase()] = data;
+                //done.push(artist.toLowerCase())
+                stillMissing.splice(stillMissing.indexOf(artist.toLowerCase()), 1)
             }
 
             // Query again without announce filter for still-missing entries
@@ -125,7 +106,6 @@
                 const fallbackJson = await fallbackRes.json();
                 for (const [artist, data] of Object.entries(fallbackJson)) {
                     allResults[artist.toLowerCase()] = data;
-                    setCachedResult(artist, data);
                 }
             }
 
@@ -340,13 +320,16 @@
     }
 
     function waitForDOM() {
+        const announceDate = postDate();
+        //console.log(announceDate)
+
         if (!document.querySelector('.md p')) {
             setTimeout(waitForDOM, 500);
             return;
         }
 
         const artists = extractArtistNames();
-        fetchFFOData(artists).then(data => {
+        fetchFFOData(artists, announceDate).then(data => {
             injectFFO(artists, data);
             addConfigUI();
             styleHeaders();
