@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Metalcore Weekly Release Thread
 // @namespace    http://tampermonkey.net/
-// @version      0.57
+// @version      0.58
 // @description  Mark up the r/Metalcore Weekly Release Threads
 // @author       nuentes
 // @match        https://old.reddit.com/r/Metalcore/comments/*/weekly_release_thread*
@@ -19,7 +19,7 @@
 
     const defaultConfig = {
         favoriteArtists: ["A Day To Remember", "Architects", "As I Lay Dying", "August Burns Red", "Beartooth", "Bring Me The Horizon", "Counterparts", "Currents", "Erra", "Ice Nine Kills", "Killswitch Engage", "Knocked Loose", "Northlane", "Parkway Drive", "Polaris", "Spiritbox", "The Devil Wears Prada", "Wage War"],
-        highlightColor: "#a0e0bd",
+        favColor: "#a0e0bd",
         ffoColor: "#dd9897"
     };
 
@@ -29,7 +29,8 @@
         if (!match) return null;
 
     	const monthName = match[1];
-    	const day = parseInt(url.match(/(\d{1,2})th/)[1]);
+    	var urlDay = parseInt(url.match(/(\d{1,2})th/)[1]);
+        const day = String(urlDay).padStart(2,'0')
     	const year = parseInt(match[2]);
 
     	// Convert month name to number
@@ -37,91 +38,110 @@
     		jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
     	};
 
-        var dayPad = String(day).padStart(2,'0')
-
-    	const monthIndex = months[monthName.substr(0,3).toLowerCase()];
-        return `${year}-${monthIndex}-${dayPad}`
+    	const month = months[monthName.substr(0,3).toLowerCase()];
+        return `${year}-${month}-${day}`
     }
 
     const CONFIG = JSON.parse(localStorage.getItem('mcw-config') || JSON.stringify(defaultConfig));
 
-    function extractArtistNames() {
-        const mdBlocks = document.querySelectorAll('.md')[1];
+    function extractArtistNames(releaseLines) {
         const artistMap = new Map();
+        for (const p of releaseLines) {
+            if (p.querySelector('strong')) continue;
 
-        //for (const md of mdBlocks) {
-            //const paragraphs = md.querySelectorAll('p');
-            const paragraphs = mdBlocks.querySelectorAll('p');
-            for (const p of paragraphs) {
-                if (p.querySelector('strong')) continue;
+            const text = p.textContent.trim();
+            const match = text.match(/^(.*?)\s*-\s*(.*)$/);
+            if (match) {
+                let artist = match[1].trim();
+                const album = match[2].trim();
 
-                const text = p.textContent.trim();
-                const match = text.match(/^(.*?)\s*-\s*(.*)$/);
-                if (match) {
-                    let artist = match[1].trim();
-                    const album = match[2].trim();
+                // Handle " x " collaborations
+                if (artist.includes(' x ')) {
+                    artist = artist.split(' x ')[0].trim();
+                }
 
-                    // Handle " x " collaborations
-                    if (artist.includes(' x ')) {
-                        artist = artist.split(' x ')[0].trim();
-                    }
-
-                    if (artist && !artistMap.has(artist.toLowerCase())) {
-                        artistMap.set(artist.toLowerCase(), {
-                            artist,
-                            album,
-                            element: p
-                        });
-                    }
+                if (artist && !artistMap.has(artist.toLowerCase())) {
+                    artistMap.set(artist.toLowerCase(), {
+                        artist,
+                        album,
+                        element: p
+                    });
                 }
             }
-        //}
+        }
 
         return Array.from(artistMap.values());
     }
 
-    async function fetchFFOData(artistObjects, announceDate) {
-        const allResults = {};
-        const stillMissing = [];
-
-        for (const obj of artistObjects) {
-            stillMissing.push(obj.artist.toLowerCase());
+    function arrayToArtistMap(array) {
+        const map = {};
+        for (const obj of array) {
+            const key = obj.artist.toLowerCase(); // normalize artist name
+            map[key] = obj;
         }
-
-        const url = `${GOOGLE_SHEET_API}?announce=${announceDate}`;
-        try {
-            const res = await fetch(url);
-            const json = await res.json();
-
-            for (const [artist, data] of Object.entries(json)) {
-                allResults[artist.toLowerCase()] = data;
-                //done.push(artist.toLowerCase())
-                stillMissing.splice(stillMissing.indexOf(artist.toLowerCase()), 1)
-            }
-
-            // Query again without announce filter for still-missing entries
-            if (stillMissing.length > 0) {
-                const fallbackUrl = `${GOOGLE_SHEET_API}?artists=${encodeURIComponent(stillMissing.join('|'))}`;
-                const fallbackRes = await fetch(fallbackUrl);
-                const fallbackJson = await fallbackRes.json();
-                for (const [artist, data] of Object.entries(fallbackJson)) {
-                    allResults[artist.toLowerCase()] = data;
-                }
-            }
-
-        } catch (err) {
-            console.error("⚠️ Failed to fetch:", err);
-        }
-
-        return allResults;
+        return map;
     }
 
+    async function fetchDate(artistObjects, announceDate) {
+        const jsonDateResults = {};
+        // clone artistObjects so we can track still missing artists after this is done
+        let stillMissing = arrayToArtistMap(
+            artistObjects.map(obj => ({ ...obj })) // shallow copy
+        );
 
-    function injectFFO(artistObjects, ffoData) {
+        //grab json data
+        const url = `${GOOGLE_SHEET_API}?announce=${announceDate}`;
+        const res = await fetch(url);
+        const json = await res.json();
+
+        //loop through results
+        for (const [artist, data] of Object.entries(json)) {
+            const artistKey = artist.toLowerCase();
+            jsonDateResults[artistKey] = data;
+            jsonDateResults[artistKey].notAnAlbum = false
+            delete stillMissing[artistKey];
+            //stillMissing = stillMissing.filter(obj => obj.artist.toLowerCase() !== artistKey);
+        }
+
+        console.log(stillMissing.length)
+        if (stillMissing.length == artistObjects.length){
+            //the backend hasn't processed this page yet, so we queue it for processing
+
+            //Best we can do is add artists
+            //fetchArtists(stillMissing)
+        } else {
+            injectData(artistObjects, jsonDateResults)
+            fetchArtists(stillMissing)
+        }
+    }
+
+    async function fetchArtists(stillMissing) {
+        // Query again without announce filter for still-missing entries
+        const jsonArtistResults = {};
+        //wipe the album field so we don't match an album
+        for (const artist in stillMissing) {
+            stillMissing[artist].notAnAlbum = true
+        }
+        console.log(stillMissing)
+        const stillMissingArray = Object.values(stillMissing);
+        if (stillMissingArray.length > 0) {
+            const fallbackUrl = `${GOOGLE_SHEET_API}?artists=${encodeURIComponent(stillMissingArray.map(o => o.artist).join('|'))}`;
+            const fallbackres = await fetch(fallbackUrl);
+            const fallbackjson = await fallbackres.json();
+
+            for (const [artist, data] of Object.entries(fallbackjson)) {
+                jsonArtistResults[artist.toLowerCase()] = data;
+            }
+        }
+
+        injectData(stillMissingArray, jsonArtistResults);
+    }
+
+    function injectData(artistObjects, jsonResults) {
         const normalizedFavorites = CONFIG.favoriteArtists.map(name => name.toLowerCase());
 
-        for (const { artist, album, element } of artistObjects) {
-            const match = ffoData[artist.toLowerCase()];
+        for (const { artist, album, element, notAnAlbum } of artistObjects) {
+            const match = jsonResults[artist.toLowerCase()];
             if (!match) continue;
 
             element.textContent = '';
@@ -147,7 +167,7 @@
             element.appendChild(container);
             element.appendChild(document.createTextNode(' - '));
 
-            if (match.spotifyAlbumId) {
+            if (!notAnAlbum) {
                 const albumLink = document.createElement('a');
                 albumLink.href = `https://open.spotify.com/album/${match.spotifyAlbumId}`;
                 albumLink.target = '_blank';
@@ -186,6 +206,8 @@
                             CONFIG.favoriteArtists.push(ffoName);
                             localStorage.setItem('mcw-config', JSON.stringify(CONFIG));
                             element.style.backgroundColor = CONFIG.ffoColor;
+                            element.classList.add('ffoArtist')
+                            element.classList.add('doNotHide')
                             plus.remove();
                         }
                     });
@@ -205,20 +227,20 @@
 
             const isFavorite = normalizedFavorites.includes(artist.toLowerCase());
             const ffoMatch = ffoList.some(name => normalizedFavorites.includes(name.toLowerCase()));
-
             if (isFavorite) {
-                element.style.backgroundColor = CONFIG.highlightColor;
+                element.style.backgroundColor = CONFIG.favColor;
+                element.classList.add('favArtist')
+                element.classList.add('doNotHide')
             } else if (ffoMatch) {
                 element.style.backgroundColor = CONFIG.ffoColor;
+                element.classList.add('ffoArtist')
+                element.classList.add('doNotHide')
             }
         }
     }
 
-    function addConfigUI() {
-        const mdElement = document.querySelector('div.expando > form > div:nth-child(2) > div:nth-child(1)');
-        if (!mdElement) return;
-
-        mdElement.style.position = 'relative';
+    function addConfigUI(postBlock, releaseLines) {
+        postBlock.style.position = 'relative';
 
         const configButton = document.createElement('button');
         configButton.textContent = '⚙️ Config';
@@ -231,23 +253,12 @@
 
         toggleButton.addEventListener('click', () => {
             showingOnlyHighlighted = !showingOnlyHighlighted;
-            toggleButton.textContent = showingOnlyHighlighted ? 'Show All' : 'Show Highlighted Only';
-
-            const paragraphs = document.querySelectorAll('.md p');
-            for (const p of paragraphs) {
-                if (p.querySelector('strong')) {
-                    p.style.display = 'block';
-                    continue;
-                }
-
-                const bg = p.style.backgroundColor;
-                if (showingOnlyHighlighted) {
-                    p.style.display = (bg === CONFIG.highlightColor || bg === CONFIG.ffoColor) ? 'block' : 'none';
-                } else {
-                    p.style.display = 'block';
-                }
-            }
-        });
+            toggleButton.textContent = showingOnlyHighlighted ? "     Show All     " : 'Show Highlighted Only';
+            document.querySelectorAll('.release-row').forEach(row => {
+                const isMarked = row.classList.contains('doNotHide');
+                row.style.display = (showingOnlyHighlighted && !isMarked) ? 'none' : '';
+            })
+        })
 
         configButton.addEventListener('click', () => {
             const configModal = document.createElement('div');
@@ -269,7 +280,7 @@
             color1Label.textContent = 'Favorite:';
             const color1Input = document.createElement('input');
             color1Input.type = 'color';
-            color1Input.value = CONFIG.highlightColor;
+            color1Input.value = CONFIG.favColor;
 
             const color2Label = document.createElement('label');
             color2Label.textContent = 'FFO:';
@@ -287,7 +298,7 @@
 
             saveButton.addEventListener('click', () => {
                 CONFIG.favoriteArtists = artistInput.value.split('\n').map(s => s.trim()).filter(Boolean);
-                CONFIG.highlightColor = color1Input.value;
+                CONFIG.favColor = color1Input.value;
                 CONFIG.ffoColor = color2Input.value;
                 localStorage.setItem('mcw-config', JSON.stringify(CONFIG));
                 configModal.remove();
@@ -302,38 +313,39 @@
             document.body.appendChild(configModal);
         });
 
-        mdElement.append(configButton, toggleButton);
+        postBlock.append(configButton, toggleButton);
     }
 
-    function styleHeaders() {
-        const headers = document.querySelectorAll('.md p strong');
-        for (const strong of headers) {
-            const p = strong.closest('p');
-            if (p) {
+    function styleHeaders(postBlock) {
+        const releaseLines = postBlock.querySelectorAll('p')
+        for (const p of releaseLines) {
+            if (p.querySelector('strong')) {
                 p.style.backgroundColor = 'black';
                 p.style.color = 'white';
                 p.style.padding = '4px 6px';
                 p.style.borderRadius = '4px';
                 p.style.marginTop = '8px';
+                p.className = "release-header"
+            } else {
+                p.classList.add('release-row')
             }
         }
     }
 
     function waitForDOM() {
         const announceDate = postDate();
-        //console.log(announceDate)
 
         if (!document.querySelector('.md p')) {
             setTimeout(waitForDOM, 500);
             return;
         }
-
-        const artists = extractArtistNames();
-        fetchFFOData(artists, announceDate).then(data => {
-            injectFFO(artists, data);
-            addConfigUI();
-            styleHeaders();
-        });
+        //grab the data from the post
+        const postBlock = document.querySelectorAll('.md')[1];
+        const releaseLines = postBlock.querySelectorAll('p');
+        styleHeaders(postBlock)
+        addConfigUI(postBlock, releaseLines)
+        const artists = extractArtistNames(releaseLines);
+        fetchDate(artists, announceDate)
     }
 
     waitForDOM();
