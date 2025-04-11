@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Metalcore Weekly Release Thread
 // @namespace    http://tampermonkey.net/
-// @version      0.58
+// @version      0.59
 // @description  Mark up the r/Metalcore Weekly Release Threads
 // @author       nuentes
 // @match        https://old.reddit.com/r/Metalcore/comments/*/weekly_release_thread*
@@ -102,8 +102,6 @@
             delete stillMissing[artistKey];
             //stillMissing = stillMissing.filter(obj => obj.artist.toLowerCase() !== artistKey);
         }
-
-        console.log(stillMissing.length)
         if (stillMissing.length == artistObjects.length){
             //the backend hasn't processed this page yet, so we queue it for processing
 
@@ -122,7 +120,6 @@
         for (const artist in stillMissing) {
             stillMissing[artist].notAnAlbum = true
         }
-        console.log(stillMissing)
         const stillMissingArray = Object.values(stillMissing);
         if (stillMissingArray.length > 0) {
             const fallbackUrl = `${GOOGLE_SHEET_API}?artists=${encodeURIComponent(stillMissingArray.map(o => o.artist).join('|'))}`;
@@ -244,16 +241,16 @@
 
         const configButton = document.createElement('button');
         configButton.textContent = '⚙️ Config';
-        configButton.style.cssText = 'position:absolute; top:10px; right:10px; padding:5px 10px; background:#333; color:white; border:none; border-radius:5px; cursor:pointer;';
+        configButton.style.cssText = 'position:absolute; top:10px; right:10px; padding:5px 10px; background:#333; color:white; border:none; border-radius:5px; cursor:pointer; height:26px';
 
         const toggleButton = document.createElement('button');
-        toggleButton.textContent = 'Show Highlighted Only';
-        toggleButton.style.cssText = 'position:absolute; top:10px; right:110px; padding:5px 10px; background:#555; color:white; border:none; border-radius:5px; cursor:pointer;';
+        toggleButton.textContent = 'Highlighted Only';
+        toggleButton.style.cssText = 'position:absolute; top:10px; right:110px; padding:5px 10px; background:#555; color:white; border:none; border-radius:5px; cursor:pointer; width:120px; height:26px';
         let showingOnlyHighlighted = false;
 
         toggleButton.addEventListener('click', () => {
             showingOnlyHighlighted = !showingOnlyHighlighted;
-            toggleButton.textContent = showingOnlyHighlighted ? "     Show All     " : 'Show Highlighted Only';
+            toggleButton.textContent = showingOnlyHighlighted ? "Show All" : 'Highlighted Only';
             document.querySelectorAll('.release-row').forEach(row => {
                 const isMarked = row.classList.contains('doNotHide');
                 row.style.display = (showingOnlyHighlighted && !isMarked) ? 'none' : '';
