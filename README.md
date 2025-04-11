@@ -17,8 +17,6 @@ All data is pulled from a google doc backend. The google doc automatically pulls
 - How does it update when code changes are made? I have no clue.
 - I don't even want to think about how it looks on mobile
 - Config is ugly as hell
-- the dev hasn't written anything in javascript in like 5 years
-- Show Highlighted Only button isn't functional
 
 **Full Disclosure:**
 - This script was almost entirely written by ChatGPT
