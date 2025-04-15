@@ -4,6 +4,8 @@
 // @version      0.60
 // @description  Mark up the r/Metalcore Weekly Release Threads
 // @author       nuentes
+// @updateURL    https://github.com/nuentes/MetalcoreReleaseThread-GM/raw/refs/heads/main/MetalcoreReleaseThread-GM.user.js
+// @downloadURL  https://github.com/nuentes/MetalcoreReleaseThread-GM/raw/refs/heads/main/MetalcoreReleaseThread-GM.user.js
 // @match        https://old.reddit.com/r/Metalcore/comments/*/weekly_release_thread*
 // @match        https://www.reddit.com/r/Metalcore/comments/*/weekly_release_thread*
 // @grant        GM_xmlhttpRequest
