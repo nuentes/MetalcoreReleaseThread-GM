@@ -14,7 +14,6 @@ All data is pulled from a google doc backend. The google doc automatically pulls
 **Known issues:**
 - Only works on Old Reddit
 - I've never tested manually installing it. I'm using it in TamperMonkey on Firefox
-- How does it update when code changes are made? I have no clue.
 - I don't even want to think about how it looks on mobile
 - Config is ugly as hell
 
