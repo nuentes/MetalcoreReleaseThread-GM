@@ -14,7 +14,7 @@
 (function () {
     'use strict';
 
-    const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbz8ZhlauDT6Ot6tVoJtiAk7n8K5MCccnbR35edkkcyCpQ2nO1qzzc241y1CGWSGOEpvGQ/exec';
+    const GOOGLE_SHEET_API = 'https://script.google.com/macros/s/AKfycbxAtYySUoh90evXB-qPSzc-bdhnC7Op9ozaYwYZGtNfdWAdtfq5RsGwdXHPBLLacoMdiw/exec';
     const THREAD_ID = location.pathname.split('/')[4];
 
     const defaultConfig = {
@@ -23,24 +23,41 @@
         ffoColor: "#dd9897"
     };
 
-    function postDate(){
+    function postDate() {
         const url = window.location.href;
-    	const match = url.match(/weekly_release_thread.*?_(\w+)_\d{1,2}th_(\d{4})/i);
-        if (!match) return null;
+        const fullMatch = url.match(/weekly_release_thread.*?_(\w+)_\d{1,2}th_(\d{4})/i);
+        const partialMatch = url.match(/weekly_release_thread.*?_(\w+)_\d{1,2}th/i);
 
-    	const monthName = match[1];
-    	var urlDay = parseInt(url.match(/(\d{1,2})th/)[1]);
-        const day = String(urlDay).padStart(2,'0')
-    	const year = parseInt(match[2]);
+        if (!partialMatch) return null;
 
-    	// Convert month name to number
-    	const months = {
-    		jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
-    	};
+        const monthName = partialMatch[1];
+        const dayMatch = url.match(/(\d{1,2})th/);
+        if (!dayMatch) return null;
 
-    	const month = months[monthName.substr(0,3).toLowerCase()];
-        return `${year}-${month}-${day}`
+        const day = String(parseInt(dayMatch[1])).padStart(2, '0');
+
+        // Convert month name to number
+        const months = {
+            jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+        };
+        const month = months[monthName.substr(0, 3).toLowerCase()];
+        if (!month) return null;
+
+        let year;
+        if (fullMatch) {
+            year = parseInt(fullMatch[2]);
+        } else {
+            // fallback to post date
+            const postDateText = document.querySelector("time")?.getAttribute("datetime");
+            if (!postDateText) return null;
+
+            const postDateObj = new Date(postDateText);
+            year = postDateObj.getFullYear();
+        }
+
+        return `${year}-${month}-${day}`;
     }
+
 
     const CONFIG = JSON.parse(localStorage.getItem('mcw-config') || JSON.stringify(defaultConfig));
 
@@ -70,7 +87,25 @@
             }
         }
 
-        return Array.from(artistMap.values());
+        return normalizeArtistObjects(Array.from(artistMap.values()))
+    }
+
+    function normalizeArtistObjects(rawArtistObjects) {
+        const result = [];
+
+        for (const obj of rawArtistObjects) {
+            const names = obj.artist.split('/').map(a => a.trim());
+
+            for (const name of names) {
+                result.push({
+                    artist: name,
+                    album: obj.album,
+                    element: obj.element,
+                });
+            }
+        }
+
+        return result;
     }
 
     function arrayToArtistMap(array) {
@@ -102,16 +137,35 @@
             delete stillMissing[artistKey];
             //stillMissing = stillMissing.filter(obj => obj.artist.toLowerCase() !== artistKey);
         }
-        if (stillMissing.length == artistObjects.length){
+        if (Object.keys(jsonDateResults).length === 0){
             //the backend hasn't processed this page yet, so we queue it for processing
-
+            queueThreadForBackend(window.location.href)
             //Best we can do is add artists
-            //fetchArtists(stillMissing)
+            fetchArtists(stillMissing)
         } else {
             injectData(artistObjects, jsonDateResults)
             fetchArtists(stillMissing)
         }
     }
+
+    function queueThreadForBackend(postUrl) {
+        GM_xmlhttpRequest({
+            method: "POST",
+            url: "https://script.google.com/macros/s/AKfycbwVkRh_SjgMJsg9V7a_21odYW33WFO6DAQ0qLRYope7OrBufhX7FdSYP-sVtj2x2ADz/exec",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            data: JSON.stringify({ url: postUrl }),
+            onload: function (res) {
+                console.log("Success:", res.responseText);
+            },
+            onerror: function (err) {
+                console.error("Error:", err);
+            }
+        })
+    }
+
+
 
     async function fetchArtists(stillMissing) {
         // Query again without announce filter for still-missing entries
