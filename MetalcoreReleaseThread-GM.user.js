@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Metalcore Weekly Release Thread
 // @namespace    http://tampermonkey.net/
-// @version      0.59
+// @version      0.60
 // @description  Mark up the r/Metalcore Weekly Release Threads
 // @author       nuentes
 // @match        https://old.reddit.com/r/Metalcore/comments/*/weekly_release_thread*
