@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Metalcore Weekly Release Thread
 // @namespace    http://tampermonkey.net/
-// @version      0.60
+// @version      0.61
 // @description  Mark up the r/Metalcore Weekly Release Threads
 // @author       nuentes
 // @updateURL    https://github.com/nuentes/MetalcoreReleaseThread-GM/raw/refs/heads/main/MetalcoreReleaseThread-GM.user.js
@@ -12,18 +12,6 @@
 // @connect      script.google.com
 // @connect      script.googleusercontent.com
 // ==/UserScript==
-
-/*
-to do:
-    fix collaborations - https://www.reddit.com/r/Metalcore/comments/1jlbdf4/weekly_release_thread_march_28th_2025/
-    Existing FFO's - put a box around them and don't add "+fav" button
-    Config option: sort favorite artist list
-    cache system for when loading a page that hasn't been opened before
-    make a sleeker config
-    progress bar
-    auto-update
-    Fix for New Reddit
-*/
 
 (function () {
     'use strict';
