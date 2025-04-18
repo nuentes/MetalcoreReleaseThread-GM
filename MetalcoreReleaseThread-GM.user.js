@@ -24,30 +24,24 @@
         favColor: "#a0e0bd",
         ffoColor: "#dd9897"
     };
-
     function postDate() {
         const url = window.location.href;
-        const fullMatch = url.match(/weekly_release_thread.*?_(\w+)_\d{1,2}th_(\d{4})/i);
-        const partialMatch = url.match(/weekly_release_thread.*?_(\w+)_\d{1,2}th/i);
 
-        if (!partialMatch) return null;
+        const trimmed = url.match(/weekly_release_thread_(.*)/i)
+        const dateString = trimmed[1].match(/(\w+)_(\d{1,2})(th|rd|nd|st).*?(\d{4})?/i);
 
-        const monthName = partialMatch[1];
-        const dayMatch = url.match(/(\d{1,2})th/);
-        if (!dayMatch) return null;
-
-        const day = String(parseInt(dayMatch[1])).padStart(2, '0');
+        const monthName = dateString[1];
+        const day = String(parseInt(dateString[2])).padStart(2, '0');
 
         // Convert month name to number
         const months = {
             jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
         };
         const month = months[monthName.substr(0, 3).toLowerCase()];
-        if (!month) return null;
 
         let year;
-        if (fullMatch) {
-            year = parseInt(fullMatch[2]);
+        if (dateString[4] !== undefined) {
+            year = dateString[4]
         } else {
             // fallback to post date
             const postDateText = document.querySelector("time")?.getAttribute("datetime");
