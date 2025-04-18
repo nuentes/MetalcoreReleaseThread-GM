@@ -15,8 +15,15 @@ All data is pulled from a google doc backend. The google doc automatically pulls
 - Only works on Old Reddit
 - I've never tested manually installing it. I'm using it in TamperMonkey on Firefox
 - I don't even want to think about how it looks on mobile
-- Config is ugly as hell
+
+**Feature Wish list:**
+- Fix for New Reddit
+- Collaborations (i.e. Invent Animate x Silent Planet, or song features) aren't handled correctly
+- better denote FFO's that are in your favorites list
+- auto-alphabetize favorite artists
+- sleeker config
+- add a progress bar to the top of the page to show loading status. If the page is being sent to the backend for caching, tell the user to try again in 15 minutes
 
 **Full Disclosure:**
-- This script was almost entirely written by ChatGPT
+- This script was almost entirely written by ChatGPT. I edited it a lot.
 - I wrote the entire backend, ChatGPT just helped me with API connections.
