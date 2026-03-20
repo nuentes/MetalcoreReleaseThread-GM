@@ -365,14 +365,28 @@
 
     function styleHeaders(postBlock) {
         const releaseLines = postBlock.querySelectorAll('p')
+
         for (const p of releaseLines) {
-            if (p.querySelector('strong')) {
+            const hasStrong = p.querySelector('strong')
+
+            // Get trimmed text content
+            const text = p.textContent.trim()
+
+            // Check for **Header**
+            const isAsteriskHeader = text.startsWith('**') && text.endsWith('**')
+
+            if (hasStrong || isAsteriskHeader) {
                 p.style.backgroundColor = 'black';
                 p.style.color = 'white';
                 p.style.padding = '4px 6px';
                 p.style.borderRadius = '4px';
                 p.style.marginTop = '8px';
                 p.className = "release-header"
+
+                // Optional: strip the ** if present
+                if (isAsteriskHeader) {
+                    p.textContent = text.slice(2, -2).trim()
+                }
             } else {
                 p.classList.add('release-row')
             }
